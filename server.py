@@ -182,8 +182,40 @@ def webhook_receive():
 
 
 @app.route("/", methods=["GET"])
+def frontend():
+    """Serve giao diện chat cho bạn bè test"""
+    with open("frontend.html", "r", encoding="utf-8") as f:
+        return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@app.route("/health", methods=["GET"])
 def health():
     return "Gà đang hoạt động 🐔", 200
+
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    """API cho frontend web"""
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "no data"}), 400
+
+    messages = data.get("messages", [])
+    if not messages:
+        return jsonify({"error": "no messages"}), 400
+
+    try:
+        response = claude.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=400,
+            system=GA_PROMPT,
+            messages=messages[-20:]
+        )
+        reply = response.content[0].text
+        return jsonify({"reply": reply})
+    except Exception as e:
+        print(f"Claude API error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
