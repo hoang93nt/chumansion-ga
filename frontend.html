@@ -200,12 +200,52 @@ body{
 .sbtn:disabled{opacity:.35;cursor:default;}
 .sbtn svg{width:16px;height:16px;fill:white;}
 
-/* FOOTER */
+.fbbar{
+  padding:8px 14px;
+  border-top:1px solid var(--bd);
+  background:var(--w);
+  display:flex;
+  gap:7px;
+  align-items:center;
+  flex-shrink:0;
+}
+
+.fbbar input{
+  flex:1;
+  border:1px solid var(--bd);
+  border-radius:20px;
+  padding:8px 14px;
+  font-family:var(--f);
+  font-size:12px;
+  outline:none;
+  color:var(--tx);
+  background:var(--bg);
+}
+
+.fbbar input:focus{border-color:var(--gold);}
+.fbbar input::placeholder{color:#bbb;font-size:11px;}
+
+.fbbtn{
+  padding:7px 14px;
+  background:var(--gold);
+  border:none;
+  border-radius:20px;
+  font-family:var(--f);
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
+  color:#4a3000;
+  white-space:nowrap;
+  transition:opacity .15s;
+}
+
+.fbbtn:hover{opacity:.85;}
+
 .footer{
   text-align:center;
   font-size:10px;
   color:#bbb;
-  padding:6px;
+  padding:5px;
   background:var(--bg);
   flex-shrink:0;
 }
@@ -246,6 +286,11 @@ Cho em hỏi mình đi mấy người và cần phòng như thế nào để em 
   <button class="sbtn" id="sbtn">
     <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
   </button>
+</div>
+
+<div class="fbbar">
+  <input id="fbInp" placeholder="Gà nói sai chỗ nào? Cần chỉnh gì? → gửi feedback">
+  <button class="fbbtn" onclick="sendFb()">Feedback 📝</button>
 </div>
 
 <div class="footer">Chu Mansion · 231 Phù Đổng Thiên Vương, Đà Lạt · 0798 285 287</div>
@@ -407,6 +452,32 @@ async function send() {
 function sq(text) {
   inp.value = text;
   send();
+}
+
+function sendFb() {
+  const fb = document.getElementById('fbInp').value.trim();
+  if (!fb) return;
+  // Gửi feedback về server để log
+  fetch('/feedback', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+      feedback: fb, 
+      history: history.slice(-10),
+      time: new Date().toLocaleString('vi-VN')
+    })
+  });
+  document.getElementById('fbInp').value = '';
+  // Hiện thông báo
+  const btn = document.querySelector('.fbbtn');
+  btn.textContent = 'Đã gửi ✓';
+  btn.style.background = '#1b5e42';
+  btn.style.color = 'white';
+  setTimeout(() => {
+    btn.textContent = 'Feedback 📝';
+    btn.style.background = '';
+    btn.style.color = '';
+  }, 2000);
 }
 </script>
 </body>

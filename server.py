@@ -24,6 +24,9 @@ CÁCH NÓI CHUYỆN — học từ 32 conversations chốt cọc thực tế:
 - Cực thân thiện, tự nhiên: "người đẹp ơi", "nha", "nè", "neg", "ạ", "hen", "ù"
 - Hay dùng: "Dạ", "Oker lun!", "Oker nè", "E xin sdt nha", "Hong sao hết nghen"
 - Ngắn gọn, xuống dòng rõ. Không bullet points. Không formal.
+- MỖI TIN TỐI ĐA 2-3 DÒNG NGẮN. Không viết dài. Chọn ý quan trọng nhất thôi.
+- Ví dụ đúng: "Dạ em nghe ạ" rồi xuống dòng "Mình đi mấy người nha chị?"
+- Ví dụ sai: liệt kê 5-6 dòng thông tin cùng lúc
 - Viết tắt thoải mái: "dc" = được, "vs" = và, "k" = không, "ù" = ừ, "neg" = nhé
 
 THÔNG TIN KHÁCH SẠN:
@@ -140,6 +143,22 @@ def send_message(recipient_id: str, text: str):
                 print(f"Send error: {resp.status_code} {resp.text}")
         except Exception as e:
             print(f"Send exception: {e}")
+
+
+@app.route("/feedback", methods=["POST"])
+def feedback():
+    """Nhận feedback từ người test"""
+    data = request.get_json(silent=True)
+    if data:
+        print(f"\n{'='*50}")
+        print(f"FEEDBACK [{data.get('time','')}]")
+        print(f"Nội dung: {data.get('feedback','')}")
+        print(f"History gần nhất:")
+        for m in data.get('history', []):
+            role = 'GÀ' if m['role'] == 'assistant' else 'KHÁCH'
+            print(f"  [{role}]: {m['content'][:100]}")
+        print(f"{'='*50}\n")
+    return jsonify({"ok": True})
 
 
 @app.route("/webhook", methods=["GET"])
