@@ -105,7 +105,7 @@ def get_ga_reply(user_id: str, text: str) -> str:
 
     try:
         response = claude.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-5",
             max_tokens=400,
             system=GA_PROMPT,
             messages=history
@@ -206,7 +206,7 @@ def chat():
 
     try:
         response = claude.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-5",
             max_tokens=400,
             system=GA_PROMPT,
             messages=messages[-20:]
