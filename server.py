@@ -7,14 +7,56 @@ Deploy: Render.com (free tier)
 import os
 import json
 import requests
+import threading
+import time
+from datetime import datetime
 from flask import Flask, request, jsonify
 import anthropic
 
 app = Flask(__name__)
 
-PAGE_TOKEN = os.environ["PAGE_ACCESS_TOKEN"]
+PAGE_TOKEN   = os.environ["PAGE_ACCESS_TOKEN"]
 VERIFY_TOKEN = os.environ["VERIFY_TOKEN"]
+SHEETS_URL   = os.environ.get("SHEETS_CSV_URL", "")
 claude = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+
+# ── Cache phòng trống ──
+room_cache = {"data": "", "updated_at": ""}
+
+def fetch_rooms():
+    if not SHEETS_URL:
+        return
+    try:
+        resp = requests.get(SHEETS_URL, timeout=10)
+        if resp.status_code == 200:
+            lines = resp.text.strip().split("\n")
+            rows = []
+            for line in lines[3:8]:
+                cols = line.split(",")
+                if len(cols) >= 6:
+                    ten  = cols[0].strip().strip('"')
+                    tong = cols[1].strip()
+                    con  = cols[3].strip()
+                    gia  = cols[4].strip()
+                    gia_cn = cols[5].strip() if len(cols) > 5 else ""
+                    rows.append(f"  - {ten}: con {con}/{tong} phong | {gia}d/dem thuong | {gia_cn}d cuoi tuan")
+            now = datetime.now().strftime("%H:%M %d/%m")
+            room_cache["data"] = "\n".join(rows)
+            room_cache["updated_at"] = now
+            print(f"[ROOMS] Cap nhat luc {now}")
+    except Exception as e:
+        print(f"[ROOMS] Loi: {e}")
+
+def schedule_rooms():
+    while True:
+        now = datetime.now()
+        if now.hour in [6, 14] and now.minute == 0:
+            fetch_rooms()
+            time.sleep(61)
+        time.sleep(30)
+
+fetch_rooms()
+threading.Thread(target=schedule_rooms, daemon=True).start()
 
 # ── System prompt Gà — học từ 32 conversations chốt cọc thành công ──
 GA_PROMPT = """Mày là Gà — nhân viên tư vấn đặt phòng của Chu Mansion Đà Lạt. Mày là con pet của khách sạn, tên Gà, vừa dễ thương vừa chốt đơn cực ngọt.
@@ -106,11 +148,22 @@ def get_ga_reply(user_id: str, text: str) -> str:
     # Giữ tối đa 20 turns để tránh token quá dài
     history = histories[user_id][-20:]
 
+    # Thêm thông tin phòng trống realtime vào prompt
+    room_info = ""
+    if room_cache["data"]:
+        room_info = f"""
+
+PHONG TRONG HIEN TAI (cap nhat {room_cache['updated_at']}):
+{room_cache['data']}
+Luu y: Day la so lieu cap nhat 2 lan/ngay (6h va 14h). Neu khach hoi chac chan hay noi "theo lich em co..." va push chot ngay."""
+
+    system_with_rooms = GA_PROMPT + room_info
+
     try:
         response = claude.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=400,
-            system=GA_PROMPT,
+            system=system_with_rooms,
             messages=history
         )
         reply = response.content[0].text
@@ -240,3 +293,80 @@ def chat():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+
+
+# ═══════════════════════════════════════
+# ZALO OA WEBHOOK
+# ═══════════════════════════════════════
+
+ZALO_OA_TOKEN = os.environ.get("ZALO_OA_TOKEN", "")
+ZALO_SECRET   = os.environ.get("ZALO_SECRET", "")
+
+def send_zalo_message(user_id: str, text: str):
+    """Gửi tin nhắn qua Zalo OA API"""
+    if not ZALO_OA_TOKEN:
+        return
+    url = "https://openapi.zalo.me/v3.0/oa/message/cs"
+    headers = {
+        "Content-Type": "application/json",
+        "access_token": ZALO_OA_TOKEN
+    }
+    # Zalo giới hạn 2000 ký tự/tin
+    chunks = [text[i:i+1990] for i in range(0, len(text), 1990)]
+    for chunk in chunks:
+        payload = {
+            "recipient": {"user_id": user_id},
+            "message": {"text": chunk}
+        }
+        try:
+            resp = requests.post(url, json=payload, headers=headers, timeout=10)
+            if resp.status_code != 200:
+                print(f"[ZALO] Send error: {resp.status_code} {resp.text}")
+        except Exception as e:
+            print(f"[ZALO] Exception: {e}")
+
+
+@app.route("/zalo-webhook", methods=["GET"])
+def zalo_verify():
+    """Zalo verify webhook"""
+    return jsonify({"error": 0})
+
+
+@app.route("/zalo-webhook", methods=["POST"])
+def zalo_receive():
+    """Nhận và xử lý tin nhắn từ Zalo OA"""
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": 0})
+
+    event_type = data.get("event_name", "")
+    print(f"[ZALO] Event: {event_type}")
+
+    # Chỉ xử lý tin nhắn text từ user
+    if event_type == "user_send_text":
+        sender = data.get("sender", {})
+        user_id = sender.get("id", "")
+        message = data.get("message", {})
+        text = message.get("text", "").strip()
+
+        if user_id and text:
+            print(f"[ZALO IN] {user_id}: {text}")
+            reply = get_ga_reply(f"zalo_{user_id}", text)
+            print(f"[ZALO OUT] Gà: {reply}")
+            send_zalo_message(user_id, reply)
+
+    # Khách follow OA → Gà chào
+    elif event_type == "follow":
+        follower = data.get("follower", {})
+        user_id = follower.get("id", "")
+        if user_id:
+            welcome = "Dạ em nghe ạ\n\nCảm ơn mình đã quan tâm đến Chu Mansion Đà Lạt 🏡\n\nCho em hỏi mình đang cần tìm phòng hay có điều gì cần em hỗ trợ nha?"
+            send_zalo_message(user_id, welcome)
+
+    return jsonify({"error": 0})
+
+
+@app.route("/zalo_verifierN8QZTOkRS5uBwCe3WC1W0GQtwoBgmJvwCZKv.html", methods=["GET"])
+def zalo_domain_verify():
+    """Zalo domain verification file"""
+    return "N8QZTOkRS5uBwCe3WC1W0GQtwoBgmJvwCZKv", 200, {"Content-Type": "text/html"}
