@@ -368,3 +368,4 @@ def zalo_domain_verify():
     """Zalo domain verification file"""
     html = """<html><head><meta name="zalo-platform-site-verification" content="N8QZTOkRS5uBwCe3WC1W0GQtwoBgmJvwCZKv"/></head><body>N8QZTOkRS5uBwCe3WC1W0GQtwoBgmJvwCZKv</body></html>"""
     return html, 200, {"Content-Type": "text/html; charset=utf-8"}
+
