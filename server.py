@@ -334,36 +334,33 @@ def zalo_verify():
 
 @app.route("/zalo-webhook", methods=["POST"])
 def zalo_receive():
-    """Nhận và xử lý tin nhắn từ Zalo OA"""
-    data = request.get_json(silent=True)
-    if not data:
-        return jsonify({"error": 0})
+    """Nhận và xử lý tin nhắn từ Zalo OA — trả 200 ngay, xử lý background"""
+    data = request.get_json(silent=True, force=True) or {}
 
-    event_type = data.get("event_name", "")
-    print(f"[ZALO] Event: {event_type}")
+    def process():
+        event_type = data.get("event_name", "")
+        print(f"[ZALO] Event: {event_type}")
 
-    # Chỉ xử lý tin nhắn text từ user
-    if event_type == "user_send_text":
-        sender = data.get("sender", {})
-        user_id = sender.get("id", "")
-        message = data.get("message", {})
-        text = message.get("text", "").strip()
+        if event_type == "user_send_text":
+            sender = data.get("sender", {})
+            user_id = sender.get("id", "")
+            message = data.get("message", {})
+            text = message.get("text", "").strip()
+            if user_id and text:
+                print(f"[ZALO IN] {user_id}: {text}")
+                reply = get_ga_reply(f"zalo_{user_id}", text)
+                print(f"[ZALO OUT] Gà: {reply}")
+                send_zalo_message(user_id, reply)
 
-        if user_id and text:
-            print(f"[ZALO IN] {user_id}: {text}")
-            reply = get_ga_reply(f"zalo_{user_id}", text)
-            print(f"[ZALO OUT] Gà: {reply}")
-            send_zalo_message(user_id, reply)
+        elif event_type == "follow":
+            follower = data.get("follower", {})
+            user_id = follower.get("id", "")
+            if user_id:
+                welcome = "Dạ em nghe ạ\n\nCảm ơn mình đã quan tâm đến Chu Mansion Đà Lạt 🏡\n\nCho em hỏi mình đang cần tìm phòng hay có điều gì cần em hỗ trợ nha?"
+                send_zalo_message(user_id, welcome)
 
-    # Khách follow OA → Gà chào
-    elif event_type == "follow":
-        follower = data.get("follower", {})
-        user_id = follower.get("id", "")
-        if user_id:
-            welcome = "Dạ em nghe ạ\n\nCảm ơn mình đã quan tâm đến Chu Mansion Đà Lạt 🏡\n\nCho em hỏi mình đang cần tìm phòng hay có điều gì cần em hỗ trợ nha?"
-            send_zalo_message(user_id, welcome)
-
-    return jsonify({"error": 0})
+    threading.Thread(target=process, daemon=True).start()
+    return jsonify({"error": 0}), 200
 
 
 @app.route("/zalo_verifierN8QZTOkRS5uBwCe3WC1W0GQtwoBgmJvwCZKv.html", methods=["GET"])
