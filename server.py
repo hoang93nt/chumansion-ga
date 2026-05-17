@@ -369,4 +369,5 @@ def zalo_receive():
 @app.route("/zalo_verifierN8QZTOkRS5uBwCe3WC1W0GQtwoBgmJvwCZKv.html", methods=["GET"])
 def zalo_domain_verify():
     """Zalo domain verification file"""
-    return "N8QZTOkRS5uBwCe3WC1W0GQtwoBgmJvwCZKv", 200, {"Content-Type": "text/html"}
+    html = """<html><head><meta name="zalo-platform-site-verification" content="N8QZTOkRS5uBwCe3WC1W0GQtwoBgmJvwCZKv"/></head><body>N8QZTOkRS5uBwCe3WC1W0GQtwoBgmJvwCZKv</body></html>"""
+    return html, 200, {"Content-Type": "text/html; charset=utf-8"}
